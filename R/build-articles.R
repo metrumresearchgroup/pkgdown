@@ -183,6 +183,11 @@ build_article <- function(name,
     }
   } else {
     format <- build_rmarkdown_format(pkg, depth = depth, data = data, toc = TRUE)
+    format$knitr$knit_hooks <- list(
+      output = colourise_chunk("output"),
+      message = colourise_chunk("message"),
+      warning = colourise_chunk("warning"),
+      error = colourise_chunk("error"))
     options <- NULL
   }
 
@@ -194,6 +199,15 @@ build_article <- function(name,
     output_options = options,
     quiet = quiet
   )
+}
+
+colourise_chunk <- function(type) {
+  function(x, options) {
+    sprintf('<div class = "%s"><pre class="knitr %s">%s</pre></div>\n',
+      type,
+      tolower(options$engine),
+      fansi::sgr_to_html(x))
+  }
 }
 
 build_rmarkdown_format <- function(pkg,
