@@ -37,6 +37,10 @@ rstudio_save_all <- function() {
 
 is_syntactic <- function(x) x == make.names(x)
 
+strip_space <- function(x) {
+  gsub("[[:space:]]+", "", x)
+}
+
 # CLI ---------------------------------------------------------------------
 
 dst_path <- function(...) {
@@ -65,3 +69,10 @@ print_yaml <- function(x) {
 print.print_yaml <- function(x, ...) {
   cat(yaml::as.yaml(x), "\n", sep = "")
 }
+
+colourise_chunk <- function(x, options) {
+  sprintf('<div class = "output"><pre class="knitr %s">%s</pre></div>\n',
+    tolower(options$engine),
+    fansi::sgr_to_html(x))
+}
+
