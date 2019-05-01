@@ -263,7 +263,7 @@ badges_extract <- function(html) {
     return(character())
   }
 
-  if (!all(xml2::xml_name(badges) %in% "a")) {
+  if (!all(xml2::xml_name(badges) %in% c("a","embed"))) {
     return(character())
   }
 
