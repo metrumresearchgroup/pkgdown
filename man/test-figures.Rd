@@ -9,12 +9,19 @@
 \examples{
 x <- seq(0, 2 * pi, length = 25)
 plot(x, sin(x))
+
+plot(1:10)
+lines(1:10)
 }
 \seealso{
-Other tests: \code{\link{test-dont}},
-  \code{\link{test-links}}, \code{\link{test-lists}},
-  \code{\link{test-output-styles}},
-  \code{\link{test-params}}
+Other tests: 
+\code{\link{test-crayon}},
+\code{\link{test-dont}},
+\code{\link{test-links}},
+\code{\link{test-lists}},
+\code{\link{test-output-styles}},
+\code{\link{test-params}},
+\code{\link{test-verbatim}}
 }
 \concept{tests}
 \keyword{internal}

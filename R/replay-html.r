@@ -45,7 +45,11 @@ replay_html.list <- function(x, ...) {
   for (i in seq_along(parts)) {
     pieces[i] <- replay_html(parts[[i]], ...)
   }
-  paste0(pieces, collapse = "")
+  res <- paste0(pieces, collapse = "")
+
+  # convert ansi escapes
+  res <- fansi::sgr_to_html(res)
+  res
 }
 
 #' @export
@@ -95,7 +99,7 @@ replay_html.error <- function(x, ...) {
 
 #' @export
 replay_html.recordedplot <- function(x, topic, obj_id, ...) {
-  fig_save_default(x, fig_name(topic, obj_id))
+  fig_save_default(x, paste0(topic, "-", obj_id()))
 }
 
 # Knitr functions ------------------------------------------------------------

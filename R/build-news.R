@@ -94,12 +94,12 @@ build_news_single <- function(pkg) {
 
 build_news_multi <- function(pkg) {
   news <- data_news(pkg)
-  major <- factor(news$major_dev, levels = unique(news$major_dev))
+  page <- factor(news$page, levels = unique(news$page))
 
   news_paged <- tibble::tibble(
-    version = levels(major),
+    version = levels(page),
     file_out = paste0("news-", version, ".html"),
-    contents = news[c("html", "version", "anchor")] %>% split(major)
+    contents = news[c("html", "version", "anchor")] %>% split(page)
   )
 
   render_news <- function(version, file_out, contents) {
@@ -138,43 +138,60 @@ data_news <- function(pkg = ".") {
   titles <- sections %>%
     xml2::xml_find_first(".//h1|h2") %>%
     xml2::xml_text(trim = TRUE)
+  anchors <- sections %>% xml2::xml_attr("id")
 
   if (any(is.na(titles))) {
     stop("Invalid NEWS.md: bad nesting of titles", call. = FALSE)
   }
 
-  anchors <- sections %>%
-    xml2::xml_attr("id")
-
-  re <- regexec("^([[:alnum:],\\.]+)\\s+((\\d+[.-]\\d+)(?:[.-]\\d+)*)", titles)
-  pieces <- regmatches(titles, re)
-
-  # Only keep sections with unambiguous version
-  is_version <- purrr::map_int(pieces, length) == 4
-  pieces <- pieces[is_version]
-  sections <- sections[is_version]
-  anchors <- anchors[is_version]
-
-  major <- purrr::map_chr(pieces, 4)
-  version <- purrr::map_chr(pieces, 3)
+  versions <- news_version(titles)
+  sections <- sections[!is.na(versions)]
+  anchors <- anchors[!is.na(versions)]
+  versions <- versions[!is.na(versions)]
 
   timeline <- pkg_timeline(pkg$package)
   html <- sections %>%
     purrr::walk(tweak_code) %>%
-    purrr::walk2(version, tweak_news_heading, timeline = timeline) %>%
+    purrr::walk2(versions, tweak_news_heading, timeline = timeline) %>%
     purrr::map_chr(as.character) %>%
     purrr::map_chr(add_github_links, pkg = pkg)
 
   news <- tibble::tibble(
-    version = version,
-    is_dev = is_dev(version),
-    major = major,
-    major_dev = ifelse(is_dev, "unreleased", major),
+    version = versions,
+    page = purrr::map_chr(versions, version_page),
     anchor = anchors,
     html = html
   )
 
   news
+}
+
+news_version <- function(x) {
+  pattern <- "(?x)
+    ^(?<package>[[:alnum:],\\.]+)\\s+ # alpha-numeric package name
+    (?<version>
+      v?                              # optional v
+      (\\d+[.-]\\d+)(?:[.-]\\d+)*     # followed by digits, dots and dashes
+      |                               # OR
+      (\\(development\\ version\\))   # literal used by usethis
+    )
+  "
+  pieces <- rematch2::re_match(x, pattern)
+  gsub("^[v(]|[)]$", "", pieces$version)
+}
+
+version_page <- function(x) {
+  if (x == "development version") {
+    return("dev")
+  }
+
+  ver <- unclass(package_version(x))[[1]]
+
+  if (length(ver) == 4 && ver[[4]] > 0) {
+    "dev"
+  } else {
+    paste0(ver[[1]], ".", ver[[2]])
+  }
 }
 
 navbar_news <- function(pkg) {
@@ -199,21 +216,12 @@ has_news <- function(path = ".") {
   file_exists(path(path, "NEWS.md"))
 }
 
-is_dev <- function(version) {
-  dev_v <- version %>%
-    package_version() %>%
-    purrr::map(unclass) %>%
-    purrr::map_dbl(c(1, 4), .null = 0)
-
-  dev_v > 0
-}
-
 pkg_timeline <- function(package) {
   if (!has_internet()) {
     return(NULL)
   }
 
-  url <- paste0("http://crandb.r-pkg.org/", package, "/all")
+  url <- paste0("https://crandb.r-pkg.org/", package, "/all")
 
   resp <- httr::GET(url)
   if (httr::http_error(resp)) {
@@ -228,13 +236,6 @@ pkg_timeline <- function(package) {
     date = as.Date(unlist(timeline)),
     stringsAsFactors = FALSE
   )
-}
-
-rel_date_html <- function(date) {
-  if (is.na(date))
-    return("<small> Unreleased</small>")
-
-  paste0("<small> ", date, "</small>")
 }
 
 tweak_news_heading <- function(x, versions, timeline) {

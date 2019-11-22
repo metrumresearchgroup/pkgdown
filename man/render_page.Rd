@@ -5,8 +5,7 @@
 \alias{data_template}
 \title{Render page with template}
 \usage{
-render_page(pkg = ".", name, data, path = "", depth = NULL,
-  quiet = FALSE)
+render_page(pkg = ".", name, data, path = "", depth = NULL, quiet = FALSE)
 
 data_template(pkg = ".", depth = 0L)
 }
@@ -20,11 +19,11 @@ data_template(pkg = ".", depth = 0L)
 This is automatically supplemented with three lists:
 \itemize{
 \item \code{site}: \code{title} and path to \code{root}.
-\item \code{yaml}: the \code{template} key from \code{_pkgdown.yml}.
+\item \code{yaml}: the \code{template} key from \verb{_pkgdown.yml}.
 \item \code{package}: package metadata including \code{name} and\code{version}.
 }
 
-See the full contents by running \code{data_template()}.}
+See the full contents by running \code{\link[=data_template]{data_template()}}.}
 
 \item{path}{Location to create file; relative to destination directory.
 If \code{""} (the default), prints to standard out.}

@@ -2,23 +2,33 @@
 #'
 #' @noMd
 #' @description
-#' \itemize{\item a}
 #'
+#' \subsection{Bulleted list}{
 #' \itemize{
 #'   \item a
 #'   \item This is an item...
 #'
 #'     That spans multiple paragraphs.
 #' }
+#' }
 #'
+#' \subsection{Bulleted list (single item)}{
+#' \itemize{\item a}
+#' }
+#'
+#' \subsection{Numbered list}{
 #' \enumerate{
 #'   \item a
 #'   \item b
 #' }
+#' }
 #'
+#' \subsection{Definition list}{
 #' \describe{
 #'   \item{a}{1}
 #'   \item{b}{2}
+#'   \item{This is a very long definition term}{}
+#' }
 #' }
 #' @keywords internal
 #' @family tests
@@ -47,6 +57,9 @@ NULL
 #' @examples
 #' x <- seq(0, 2 * pi, length = 25)
 #' plot(x, sin(x))
+#'
+#' plot(1:10)
+#' lines(1:10)
 NULL
 
 #' Test case: don't
@@ -56,11 +69,23 @@ NULL
 #' @family tests
 #' @examples
 #' \dontrun{
+#'   stop("This is an error!", call. = FALSE)
+#' }
+#'
+#' # Inline \donttest is silently ommitted
+#' \donttest{message("Hi!")}
+#'
+#' # Block \donttest indicated with comments
+#' \donttest{
+#' # This is a comment
 #' 1 + 3
 #' }
 #'
-#' \donttest{
-#' 1 + 3
+#' # And works even when not at the top level
+#' if (TRUE) {
+#'   \donttest{
+#'   1 + 2
+#'   }
 #' }
 #'
 #' answer <- 1
@@ -106,15 +131,46 @@ NULL
 #'   1 + 2
 #'   2 + 2
 #' }
+NULL
+
+
+#' Test case: crayon
 #'
-#' \dontrun{
-#' stop("This is an error!", call. = FALSE)
-#' }
+#' @name test-crayon
+#' @keywords internal
+#' @family tests
 #'
-#' \donttest{
-#' # This code won't generally be run by CRAN. But it
-#' # will be run by pkgdown
-#' b <- 10
-#' a + b
-#' }
+#' @examples
+#' cat(crayon::red("This is red"), "\n")
+#' cat(crayon::blue("This is blue"), "\n")
+#'
+#' message(crayon::green("This is green"))
+#'
+#' warning(crayon::bold("This is bold"))
+NULL
+
+#' Test case: verbatim blocks
+#'
+#' This description block is required so that verbatim blocks are recognized
+#' and rendered correctly.
+#'
+#' ```
+#' foo
+#'
+#' bar
+#' ```
+#'
+#' ```
+#' yaml:
+#'   this
+#'
+#' OR:
+#'
+#' yaml:
+#'   that
+#' ```
+#'
+#' @name test-verbatim
+#' @keywords internal
+#' @family tests
 NULL

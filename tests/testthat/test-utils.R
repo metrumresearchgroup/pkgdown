@@ -14,14 +14,19 @@ test_that("find_reexport_source_from_imports", {
     find_reexport_source_from_imports(ns, "ns_env_name"),
     "rlang"
   )
-  expect_equal(
-    find_reexport_source_from_imports(ns, "R6Class"),
-    "R6"
-  )
 })
 
 test_that("pkgdown.internet can be set and read", {
   options(pkgdown.internet = FALSE)
   expect_false(has_internet())
+})
+
+test_that("cran_unquote works", {
+  expect_equal(cran_unquote("Quoting is CRAN's thing."),
+               "Quoting is CRAN's thing.")
+  expect_equal(cran_unquote("'R-hub' is great!"),
+               "R-hub is great!")
+  expect_equal(cran_unquote("From 'README' to 'html' with 'pkgdown'"),
+               "From README to html with pkgdown")
 })
 

@@ -1,10 +1,11 @@
 set_contains <- function(haystack, needles) {
   all(needles %in% haystack)
 }
+
 split_at_linebreaks <- function(text) {
   if (length(text) < 1)
     return(character())
-  str_trim(strsplit(text, "\\n\\s*\\n")[[1]])
+  strsplit(text, "\\n\\s*\\n")[[1]]
 }
 
 up_path <- function(depth) {
@@ -79,7 +80,6 @@ devtools_meta <- function(x) {
   ns[[".__DEVTOOLS__"]]
 }
 
-
 # CLI ---------------------------------------------------------------------
 
 dst_path <- function(...) {
@@ -121,4 +121,10 @@ with_dir <- function(new, code) {
   old <- setwd(dir = new)
   on.exit(setwd(old))
   force(code)
+}
+
+# remove '' quoting
+# e.g. 'title' becomes title.s
+cran_unquote <- function(string) {
+  gsub("\\'(.*?)\\'", "\\1", string)
 }

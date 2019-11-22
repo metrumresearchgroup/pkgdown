@@ -4,26 +4,18 @@ build_home_index <- function(pkg = ".", quiet = TRUE) {
   scoped_package_context(pkg$package, pkg$topic_index, pkg$article_index)
   scoped_file_context(depth = 0L)
 
-  src_path <- path_first_existing(
-    pkg$src_path,
-    c("index.Rmd", "README.Rmd", "index.md", "README.md")
+  src_path <- path_first_existing(pkg$src_path,
+    c("index.md", "README.md", "index.Rmd", "README.Rmd")
   )
   dst_path <- path(pkg$dst_path, "index.html")
   data <- data_home(pkg)
 
   if (is.null(src_path)) {
     data$index <- linkify(pkg$desc$get("Description")[[1]])
-    render_page(pkg, "home", data, "index.html")
   } else {
-    file_ext <- path_ext(src_path)
-
-    if (file_ext == "md") {
-      data$index <- markdown(src_path)
-      render_page(pkg, "home", data, "index.html")
-    } else if (file_ext == "Rmd") {
-      render_index(pkg, path_rel(src_path, pkg$src_path), data = data, quiet = quiet)
-    }
+    data$index <- markdown(src_path)
   }
+  render_page(pkg, "home", data, "index.html")
 
   strip_header <- isTRUE(pkg$meta$home$strip_header)
   update_html(dst_path, tweak_homepage_html, strip_header = strip_header)
@@ -35,7 +27,10 @@ build_home_index <- function(pkg = ".", quiet = TRUE) {
 render_index <- function(pkg = ".", path, data = list(), quiet = TRUE) {
   pkg <- as_pkgdown(pkg)
 
-  format <- build_rmarkdown_format(pkg, depth = 0L, data = data, toc = FALSE)
+  format <- build_rmarkdown_format(pkg, "article",
+                                   depth = 0L,
+                                   data = data, toc = FALSE
+  )
   render_rmarkdown(
     pkg = pkg,
     input = path,
@@ -50,9 +45,11 @@ data_home <- function(pkg = ".") {
   pkg <- as_pkgdown(pkg)
 
   print_yaml(list(
-    pagetitle = pkg$desc$get("Title")[[1]],
+    pagetitle = pkg$meta$home[["title"]] %||%
+      cran_unquote(pkg$desc$get("Title")[[1]]),
     sidebar = data_home_sidebar(pkg),
-    opengraph = list(description = pkg$desc$get("Description")[[1]])
+    opengraph = list(description = pkg$meta$home[["description"]] %||%
+                       cran_unquote(pkg$desc$get("Description")[[1]]))
   ))
 }
 
@@ -65,6 +62,7 @@ data_home_sidebar <- function(pkg = ".") {
     data_home_sidebar_hex(pkg),
     data_home_sidebar_links(pkg),
     data_home_sidebar_license(pkg),
+    data_home_sidebar_community(pkg),
     data_home_sidebar_citation(pkg),
     data_home_sidebar_authors(pkg),
     collapse = "\n"
@@ -91,7 +89,8 @@ data_home_sidebar_links <- function(pkg = ".") {
   links <- c(
     link_url(paste0("Download from ", repo$repo), repo$url),
     link_url("Browse source code", pkg$github_url),
-    link_url("Report a bug", pkg$desc$get("BugReports")[[1]]),
+    if (pkg$desc$has_fields("BugReports"))
+      link_url("Report a bug", pkg$desc$get("BugReports")[[1]]),
     purrr::map_chr(meta, ~ link_url(.$text, .$href))
   )
 

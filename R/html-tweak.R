@@ -29,6 +29,10 @@ tweak_anchors <- function(html, only_contents = TRUE) {
   for (i in seq_along(headings)[has_heading]) {
     # Insert anchor in first element of header
     heading <- headings[[i]]
+    if (length(xml2::xml_contents(heading)) == 0) {
+      # skip empty headings
+      next
+    }
 
     xml2::xml_attr(heading, "class") <- "hasAnchor"
     xml2::xml_add_sibling(
@@ -47,7 +51,7 @@ tweak_md_links <- function(html) {
     return()
 
   hrefs <- xml2::xml_attr(links, "href")
-  md_exts <- grepl("\\.md$", hrefs)
+  needs_tweak <- grepl("\\.md$", hrefs) & xml2::url_parse(hrefs)$scheme == ""
 
   fix_links <- function(x) {
     x <- gsub("\\.md$", ".html", x)
@@ -55,10 +59,10 @@ tweak_md_links <- function(html) {
     x
   }
 
-  if (any(md_exts)) {
+  if (any(needs_tweak)) {
     purrr::walk2(
-      links[md_exts],
-      fix_links(hrefs[md_exts]),
+      links[needs_tweak],
+      fix_links(hrefs[needs_tweak]),
       xml2::xml_set_attr,
       attr = "href"
     )
@@ -83,7 +87,7 @@ tweak_tables <- function(html) {
 }
 
 prepend_class <- function(x, class = "table") {
-  if (!'class'%in%names(x)) {
+  if (!('class' %in% names(x))) {
     c(class = class)
   } else {
     c(class = paste(class, x[["class"]]))
@@ -101,12 +105,17 @@ tweak_code <- function(x) {
     xml2::xml_find_all(".//pre[contains(@class, 'r')]") %>%
     purrr::map(tweak_pre_node)
 
-  # Needs to second so have all packages loaded in chunks
-  # <code> with no children (just text)
+  # Identify <code> with no children (just text), and are not ancestors of a
+  # header
   x %>%
-    xml2::xml_find_all(".//code[count(*) = 0]") %>%
+    xml2::xml_find_all(
+      paste0(
+        ".//code[count(*) = 0 and ",
+        "not(ancestor::h1|ancestor::h2|ancestor::h3|ancestor::h4|ancestor::h5) and ",
+        "not(ancestor::div[contains(@id, 'tocnav')])]"
+      )
+    ) %>%
     tweak_code_nodeset()
-
 
   invisible()
 }
@@ -139,7 +148,7 @@ tweak_pre_node <- function(node, ...) {
 
   # Extract text and link
   text <- span %>% xml2::xml_text()
-  href <- chr_along(text)
+  href <- rep_along(text, na_chr)
   href[has_pkg] <- purrr::map2_chr(text[has_pkg], pkg[has_pkg], href_topic_remote)
   href[!has_pkg] <- purrr::map_chr(text[!has_pkg], href_topic_local)
 
@@ -242,8 +251,15 @@ tweak_homepage_html <- function(html, strip_header = FALSE) {
 
 # Mutates `html`, removing the badge container
 badges_extract <- function(html) {
-  # First try specially named div; then try first paragraph
+  # First try specially named div;
   x <- xml2::xml_find_first(html, "//div[@id='badges']")
+
+  # then try usethis-readme-like paragraph;
+  if (length(x) == 0) {
+    x <- xml2::xml_find_all(html, ".//*/comment()[contains(., 'badges: start')]/following-sibling::p[1]")
+  }
+
+  # finally try first paragraph
   if (length(x) == 0) {
     x <- xml2::xml_find_first(html, "//p")
   }
@@ -276,7 +292,6 @@ badges_extract_text <- function(x) {
   xml <- xml2::read_html(x)
   badges_extract(xml)
 }
-
 # Update file on disk -----------------------------------------------------
 
 update_html <- function(path, tweak, ...) {

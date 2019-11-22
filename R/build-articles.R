@@ -1,20 +1,31 @@
 #' Build articles section
 #'
+#' @description
 #' Each R Markdown vignette in `vignettes/` and its subdirectories is rendered
-#' and saved to `articles/`. Vignettes are rendered using a special document
+#' and saved to `articles/`.
+#'
+#' The only exception are `.Rmd` vignettes that start with `_` (i.e., `_index.Rmd`), enabling the use of child documents in [bookdown](https://bookdown.org/yihui/bookdown/), and vignettes in a `tutorials` subdirectory, which is reserved for tutorials built with `build_tutorials()`
+#'
+#' Vignettes are rendered using a special document
 #' format that reconciles [rmarkdown::html_document()] with your pkgdown
 #' template.
 #'
+#' Note that when run by itself (i.e. not by `build_site()`), vignettes will
+#' use a previous installed version of the package, not the current source
+#' version.
+#'
+#' @section Get started vignette:
 #' A vignette with the same name as the package (e.g., `vignettes/pkgdown.Rmd`)
 #' gets special treatment. It is rendered and linked to in the navbar under
-#' "Get started".
+#' "Get started". Rmarkdown files in `vignettes/tutorials/` are ignored,
+#' because these are assumed to contain tutorials, see `build_tutorials()`.
 #'
 #' @section External files:
 #' pkgdown differs from base R in its handling of external files. When building
 #' vignettes, R assumes that vignettes are self-contained (a reasonable
 #' assumption when most vignettes were PDFs) and only copies files explicitly
 #' listed in `.install_extras`. pkgdown takes a different approach based on
-#' [rmarkdown::find_external_resources], and it will also copy any images that
+#' [rmarkdown::find_external_resources()], and it will also copy any images that
 #' you link to. If for some reason the automatic detection doesn't work, you
 #' will need to add a `resource_files` field to the yaml metadata, e.g.:
 #'
@@ -30,13 +41,22 @@
 #' Note that you can not use the `fig.path` to change the output directory of
 #' generated figures as its default value is a strong assumption of rmarkdown.
 #'
+#' @section Embedding Shiny apps:
+#' If you would like to embed a Shiny app into an article, the app will have
+#' to be hosted independently, (e.g. <https://www.shinyapps.io>). Then, you
+#' can embed the app into your article using an `<iframe>`, e.g.
+#' `<iframe src = "https://gallery.shinyapps.io/083-front-page" class="shiny-app">`.
+#'
+#' See <https://github.com/r-lib/pkgdown/issues/838#issuecomment-430473856> for
+#' some hints on how to customise the appearance with CSS.
+#'
 #' @section YAML config:
 #' To tweak the index page, you need a section called `articles`,
 #' which provides a list of sections containing, a `title`, list of
 #' `contents`, and optional `description`.
 #'
 #' For example, this imaginary file describes some of the structure of
-#' the \href{http://rmarkdown.rstudio.com/articles.html}{R markdown articles}:
+#' the [R markdown articles](http://rmarkdown.rstudio.com/articles.html):
 #'
 #' ```
 #' articles:
@@ -62,18 +82,21 @@
 #'
 #' @section YAML header:
 #' By default, pkgdown builds all articles with [rmarkdown::html_document()]
-#' using setting the `template` parameter to a custom built template that
-#' matches the site template. You can override this with a `pkgdown` field
-#' in your yaml metadata:
+#' by setting the `template` parameter. This overrides any custom settings
+#' you have in your YAML metadata, ensuring that all articles are rendered
+#' in the same way (and receive the default site template).
+#'
+#' If you need to override the output format, or set any options, you'll need
+#' to add a `pkgdown` field to your yaml metadata:
 #'
 #' ```
 #' pkgdown:
 #'   as_is: true
 #' ```
 #'
-#' This will tell pkgdown to use the `output_format` that you have specified.
-#' This format must accept `template`, `theme`, and `self_contained` in
-#' order to work with pkgdown.
+#' This will tell pkgdown to use the `output_format` (and options) that you
+#' have specified. This format must accept `template`, `theme`, and
+#' `self_contained` in order to work with pkgdown.
 #'
 #' If the output format produces a PDF, you'll also need to specify the
 #' `extension` field:
@@ -172,8 +195,10 @@ build_article <- function(name,
   scoped_package_context(pkg$package, pkg$topic_index, pkg$article_index)
   scoped_file_context(depth = depth)
 
+  front <- rmarkdown::yaml_front_matter(input_path)
+
   default_data <- list(
-    pagetitle = "$title$",
+    pagetitle = front$title,
     opengraph = list(description = "$description$"),
     source = github_source_links(pkg$github_url, path_rel(input, pkg$src_path)),
     filename = path_file(input)
@@ -181,7 +206,6 @@ build_article <- function(name,
   data <- utils::modifyList(default_data, data)
 
   # Allow users to opt-in to their own template
-  front <- rmarkdown::yaml_front_matter(input_path)
   ext <- purrr::pluck(front, "pkgdown", "extension", .default = "html")
   as_is <- isTRUE(purrr::pluck(front, "pkgdown", "as_is"))
 
@@ -189,7 +213,7 @@ build_article <- function(name,
     format <- NULL
 
     if (identical(ext, "html")) {
-      template <- rmarkdown_template(pkg, depth = depth, data = data)
+      template <- rmarkdown_template(pkg, "article", depth = depth, data = data)
 
       options <- list(
         template = template$path,
@@ -200,7 +224,13 @@ build_article <- function(name,
       options <- list()
     }
   } else {
-    format <- build_rmarkdown_format(pkg, depth = depth, data = data, toc = TRUE)
+    format <- build_rmarkdown_format(
+      pkg = pkg,
+      name = "article",
+      depth = depth,
+      data = data,
+      toc = TRUE
+    )
     options <- NULL
   }
 
@@ -215,11 +245,12 @@ build_article <- function(name,
 }
 
 build_rmarkdown_format <- function(pkg,
+                                   name,
                                    depth = 1L,
                                    data = list(),
                                    toc = TRUE) {
 
-  template <- rmarkdown_template(pkg, depth = depth, data = data)
+  template <- rmarkdown_template(pkg, name, depth = depth, data = data)
 
   out <- rmarkdown::html_document(
     toc = toc,
@@ -239,9 +270,9 @@ build_rmarkdown_format <- function(pkg,
 # inst/template/article-vignette.html
 # Output is a path + environment; when the environment is garbage collected
 # the path will be deleted
-rmarkdown_template <- function(pkg, data, depth) {
+rmarkdown_template <- function(pkg, name, data, depth) {
   path <- tempfile(fileext = ".html")
-  render_page(pkg, "article", data, path, depth = depth, quiet = TRUE)
+  render_page(pkg, name, data, path, depth = depth, quiet = TRUE)
 
   # Remove template file when format object is GC'd
   e <- env()

@@ -7,8 +7,8 @@ test_that("github links are added to news items", {
   pkg <- as_pkgdown(path)
   news_tbl <- data_news(pkg)
 
-  user_link <- "<a href='http://github.com/hadley'>@hadley</a>"
-  user_link2 <- "<a href='http://github.com/josue-rodriguez'>@josue-rodriguez</a>"
+  user_link <- "<a href='https://github.com/hadley'>@hadley</a>"
+  user_link2 <- "<a href='https://github.com/josue-rodriguez'>@josue-rodriguez</a>"
   issue_link <- "<a href='https://github.com/hadley/pkgdown/issues/100'>#100</a>"
 
   expect_true(grepl(user_link, news_tbl$html))
@@ -57,6 +57,7 @@ test_that("multi-page news are rendered", {
 
   path <- test_path("assets/news-multi-page")
   pkg <- as_pkgdown(path)
+  on.exit(clean_site(pkg))
   expect_output(build_news(pkg))
 
   # test that index links are correct
@@ -66,4 +67,22 @@ test_that("multi-page news are rendered", {
   # test single page structure
   lines <- read_lines(path(path, "docs", "news", "news-1.0.html"))
   expect_true(any(grepl("<h1>Changelog <small>1.0</small></h1>", lines)))
+})
+
+
+# news_title and version_page -----------------------------------------------
+
+test_that("can recognise common forms of title", {
+  version <- news_version(c(
+    "pkgdown 1.3.0",
+    "pkgdown v1.3.0",
+    "pkgdown (development version)"
+  ))
+  expect_equal(version, c("1.3.0", "1.3.0", "development version"))
+})
+
+test_that("correctly collapses version to page for common cases", {
+  versions <- c("1.0.0", "1.0.0.0", "1.0.0.9000", "development version")
+  pages <- purrr::map_chr(versions, version_page)
+  expect_equal(pages, c("1.0", "1.0", "dev", "dev"))
 })

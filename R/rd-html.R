@@ -28,9 +28,15 @@ flatten_para <- function(x, ...) {
   after_break <- c(FALSE, before_break[-length(x)])
   groups <- cumsum(before_break | after_break)
 
-  html <- purrr::map_chr(x, as_html, ...)
+  html <- purrr::map(x, as_html, ...)
+  # split at line breaks for everything except blocks
+  empty <- purrr::map_lgl(x, purrr::is_empty)
+  needs_split <- !is_block & !empty
+  html[needs_split] <- purrr::map(html[needs_split], split_at_linebreaks)
+
   blocks <- html %>%
     split(groups) %>%
+    purrr::map(unlist) %>%
     purrr::map_chr(paste, collapse = "")
 
   # There are three types of blocks:
@@ -92,53 +98,59 @@ as_html.USERMACRO <-  function(x, ...) ""
 as_html.tag_subsection <- function(x, ...) {
   paste0(
     "<h3>", flatten_text(x[[1]], ...), "</h3>\n",
-    flatten_text(x[[2]], ...)
+    flatten_para(x[[2]], ...)
   )
 }
 
 # Equations ------------------------------------------------------------------
 
 #' @export
-as_html.tag_eqn <- function(x, ..., mathjax = TRUE) {
-  stopifnot(length(x) <= 2)
-  if (isTRUE(mathjax)){
-    latex_rep <- x[[1]]
-    paste0("\\(", flatten_text(latex_rep, ...), "\\)")
-  }else{
-    ascii_rep <- x[[length(x)]]
-    paste0("<code class = 'eq'>", flatten_text(ascii_rep, ...), "</code>")
+as_html.tag_eqn <- function(x, ...) {
+  if (length(x) > 2) {
+    stop_bad_tag("eqn")
   }
+
+  latex_rep <- x[[1]]
+  paste0("\\(", flatten_text(latex_rep, ...), "\\)")
 }
 
 #' @export
-as_html.tag_deqn <- function(x, ..., mathjax = TRUE) {
-  stopifnot(length(x) <= 2)
-  if (isTRUE(mathjax)) {
-    latex_rep <- x[[1]]
-    paste0("$$", flatten_text(latex_rep, ...), "$$")
-  }else{
-    ascii_rep <- x[[length(x)]]
-    paste0("<pre class = 'eq'>", flatten_text(ascii_rep, ...), "</pre>")
+as_html.tag_deqn <- function(x, ...) {
+  if (length(x) > 2) {
+    stop_bad_tag("deqn")
   }
+  latex_rep <- x[[1]]
+  paste0("$$", flatten_text(latex_rep, ...), "$$")
 }
 
 # Links ----------------------------------------------------------------------
 #' @export
 as_html.tag_url <- function(x, ...) {
-  stopifnot(length(x) == 1)
+  if (length(x) != 1) {
+    if (length(x) == 0) {
+      msg <- "Check for empty \\url{} tags."
+    } else {
+      msg <- "This may be caused by a \\url tag that spans a line break."
+    }
+    stop_bad_tag("url", msg)
+  }
 
   text <- flatten_text(x[[1]])
   a(text, href = text)
 }
 #' @export
 as_html.tag_href <- function(x, ...) {
-  stopifnot(length(x) == 2)
+  if (length(x) != 2) {
+    stop_bad_tag("href")
+  }
 
   a(flatten_text(x[[2]]), href = flatten_text(x[[1]]))
 }
 #' @export
 as_html.tag_email <- function(x, ...) {
-  stopifnot(length(x) %in% c(1L, 2L))
+  if (!length(x) %in% c(1L, 2L)) {
+    stop_bad_tag("email")
+  }
   paste0("<a href='mailto:", x[[1]], "'>", x[[length(x)]], "</a>")
 }
 
@@ -185,7 +197,9 @@ as_html.tag_link <- function(x, ...) {
 
 #' @export
 as_html.tag_linkS4class <- function(x, ...) {
-  stopifnot(length(x) == 1)
+  if (length(x) != 1) {
+    stop_bad_tag("linkS4class")
+  }
 
   text <- flatten_text(x[[1]])
   href <- href_topic_local(paste0(text, "-class"))
@@ -257,15 +271,21 @@ as_html.tag_tabular <- function(x, ...) {
   align <- unname(c("r" = "right", "l" = "left", "c" = "center")[align_abbr])
 
   contents <- x[[2]]
-  row_sep <- purrr::map_lgl(contents, inherits, "tag_cr")
-  col_sep <- purrr::map_lgl(contents, inherits, "tag_tab")
+  class <- purrr::map_chr(contents, ~ class(.x)[[1]])
+  cell_contents <- purrr::map_chr(contents, flatten_text, ...)
 
+  row_sep <- class == "tag_cr"
+  contents[row_sep] <- list("")
+  col_sep <- class == "tag_tab"
   sep <- col_sep | row_sep
-  cell_grp <- cumsum(sep)
-  cells <- split(contents[!sep], cell_grp[!sep])
 
-  cell_contents <- vapply(cells, flatten_text, ...,
-    FUN.VALUE = character(1), USE.NAMES = FALSE)
+  # Identify groups in reverse order (preserve empty cells)
+  # Negative maintains correct ordering once reversed
+  cell_grp <- rev(cumsum(-rev(sep)))
+  cells <- unname(split(contents, cell_grp))
+  # Remove tailing content (that does not match the dimensions of the table)
+  cells <- cells[seq_len(length(cells) - length(cells)%%length(align))]
+  cell_contents <- purrr::map_chr(cells, flatten_text, ...)
   cell_contents <- paste0("<td>", str_trim(cell_contents), "</td>")
 
   if(length(cell_contents)%%length(align)>0){
@@ -314,7 +334,7 @@ as_html.tag_enumerate <- function(x, ...) {
 }
 #' @export
 as_html.tag_describe <- function(x, ...) {
-  paste0("<dl class='dl-horizontal'>\n", parse_descriptions(x[-1], ...), "</dl>")
+  paste0("<dl class='dl-horizontal'>\n", parse_descriptions(x[-1], ...), "\n</dl>")
 }
 
 # Effectively does nothing: only used by parse_items() to split up
@@ -451,9 +471,9 @@ tag_insert <- function(value) {
 #' @export
 as_html.tag_R <-        tag_insert('<span style="R">R</span>')
 #' @export
-as_html.tag_dots <-     tag_insert("&#8230;")
+as_html.tag_dots <-     tag_insert("...")
 #' @export
-as_html.tag_ldots <-    tag_insert("&#8230;")
+as_html.tag_ldots <-    tag_insert("...")
 
 #' @export
 as_html.tag_cr <-       tag_insert("<br >")
@@ -540,3 +560,25 @@ parse_opts <- function(string) {
   as.list(env)
 }
 
+stop_bad_tag <- function(tag, msg = NULL) {
+  fxn <- context_get("rdname")
+
+  msg <- paste0(
+    "Function `", fxn,
+    "` contains a bad Rd tag of type `", tag,
+    "`. ", msg
+  )
+
+  stop(msg, call. = FALSE)
+}
+
+is_newline <- function(x, trim = FALSE) {
+  if (!inherits(x, "TEXT") && !inherits(x, "RCODE") && !inherits(x, "VERB"))
+    return(FALSE)
+
+  text <- x[[1]]
+  if (trim) {
+    text <- gsub("^[ \t]+|[ \t]+$", "", text)
+  }
+  identical(text, "\n")
+}

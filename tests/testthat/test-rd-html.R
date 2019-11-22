@@ -15,11 +15,19 @@ test_that("simple wrappers work as expected", {
 })
 
 test_that("simple replacements work as expected", {
-  expect_equal(rd2html("\\ldots"), "&#8230;")
+  expect_equal(rd2html("\\ldots"), "...")
+  expect_equal(rd2html("\\dots"), "...")
 })
 
 test_that("subsection generates h3", {
-  expect_equal(rd2html("\\subsection{A}{B}"), c("<h3>A</h3>", "B"))
+  expect_equal(rd2html("\\subsection{A}{B}"), c("<h3>A</h3>", "<p>B</p>"))
+})
+test_that("subsection generates h3", {
+  expect_equal(rd2html("\\subsection{A}{
+    p1
+
+    p2
+  }"), c("<h3>A</h3>", "<p>p1</p>", "<p>p2</p>"))
 })
 
 test_that("if generates html", {
@@ -32,19 +40,16 @@ test_that("ifelse generates html", {
   expect_equal(rd2html("\\ifelse{latex}{x}{\\bold{a}}"), "<b>a</b>")
 })
 
-test_that("tabular converted to html", {
-  table <- "\\tabular{ll}{a \\tab b \\cr}"
-  expectation <- c("<table class='table'>", "<tr><td>a</td><td>b</td></tr>", "</table>")
-  expect_equal(rd2html(table), expectation)
+test_that("out is for raw html", {
+  expect_equal(rd2html("\\out{<hr />}"), "<hr />")
 })
 
-test_that("can omit trailing \\crs", {
-  table <- "\\tabular{l}{a \\cr b \\cr c}"
-  expectation <- c("<table class='table'>", "<tr><td>a</td></tr>", "<tr><td>b</td></tr>", "<tr><td>c</td></tr>", "</table>")
-  expect_equal(rd2html(table), expectation)
 
-  table <- "\\tabular{lll}{a \\tab b \\tab c}"
-  expectation <- c("<table class='table'>", "<tr><td>a</td><td>b</td><td>c</td></tr>", "</table>")
+# tables ------------------------------------------------------------------
+
+test_that("tabular genereates complete table html", {
+  table <- "\\tabular{ll}{a \\tab b \\cr}"
+  expectation <- c("<table class='table'>", "<tr><td>a</td><td>b</td></tr>", "</table>")
   expect_equal(rd2html(table), expectation)
 })
 
@@ -54,11 +59,59 @@ test_that("internal \\crs are stripped", {
   expect_equal(rd2html(table), expectation)
 })
 
-
-test_that("out is for raw html", {
-  expect_equal(rd2html("\\out{<hr />}"), "<hr />")
+test_that("can convert single row", {
+  expect_equal(
+    rd2html("\\tabular{lll}{A \\tab B \\tab C \\cr}")[[2]],
+    "<tr><td>A</td><td>B</td><td>C</td></tr>"
+  )
 })
 
+
+test_that("don't need internal whitespace", {
+  expect_equal(
+    rd2html("\\tabular{lll}{\\tab\\tab C\\cr}")[[2]],
+    "<tr><td></td><td></td><td>C</td></tr>"
+  )
+  expect_equal(
+    rd2html("\\tabular{lll}{\\tab B \\tab\\cr}")[[2]],
+    "<tr><td></td><td>B</td><td></td></tr>"
+  )
+  expect_equal(
+    rd2html("\\tabular{lll}{A\\tab\\tab\\cr}")[[2]],
+    "<tr><td>A</td><td></td><td></td></tr>"
+  )
+
+  expect_equal(
+    rd2html("\\tabular{lll}{\\tab\\tab\\cr}")[[2]],
+    "<tr><td></td><td></td><td></td></tr>"
+  )
+})
+
+test_that("can skip trailing \\cr", {
+  expect_equal(
+    rd2html("\\tabular{lll}{A \\tab B \\tab C}")[[2]],
+    "<tr><td>A</td><td>B</td><td>C</td></tr>"
+  )
+})
+
+test_that("code blocks in tables render (#978)", {
+  expect_equal(
+    rd2html('\\tabular{ll}{a \\tab \\code{b} \\cr foo \\tab bar}')[[2]],
+    "<tr><td>a</td><td><code>b</code></td></tr>"
+  )
+})
+
+test_that("tables with tailing \n (#978)", {
+  expect_equal(
+    rd2html('
+      \\tabular{ll}{
+        a   \\tab     \\cr
+        foo \\tab bar
+      }
+    ')[[2]],
+    "<tr><td>a</td><td></td></tr>"
+  )
+})
 
 # sexpr  ------------------------------------------------------------------
 
@@ -121,9 +174,11 @@ test_that("DOIs are linked", {
   scoped_package_context("pkgdown", src_path = "../..")
   scoped_file_context()
 
-  expect_equal(
-    rd2html("\\doi{10.1177/0163278703255230}"),
-    "doi: <a href='http://doi.org/10.1177/0163278703255230'>10.1177/0163278703255230</a>"
+  expect_true(
+    rd2html("\\doi{test}") %in%
+      c("doi: <a href='http://doi.org/test'>test</a>",
+        "doi: <a href='https://doi.org/test'>test</a>"
+      )
   )
 })
 
@@ -141,7 +196,7 @@ test_that("can convert cross links to online documentation url", {
 
   expect_equal(
     rd2html("\\link[base]{library}"),
-    a("library", href = "http://www.rdocumentation.org/packages/base/topics/library")
+    a("library", href = "https://rdrr.io/r/base/library.html")
   )
 })
 
@@ -169,7 +224,7 @@ test_that("can parse local links with topic!=label", {
   )
 })
 
-test_that("functions in other packages generates link to rdocumentation.org", {
+test_that("functions in other packages generates link to rdrr.io", {
   scoped_package_context("mypkg", c(x = "x", y = "y"))
   scoped_file_context("x")
 
@@ -254,6 +309,32 @@ test_that("cr generates line break", {
   expect_equal(out, "<p>a <br /> b</p>")
 })
 
+test_that("nested item with whitespace parsed correctly", {
+  out <- rd2html("
+    \\describe{
+    \\item{Label}{
+
+      This text is indented in a way pkgdown doesn't like.
+  }}")
+  expect_equal(out, c(
+    "<dl class='dl-horizontal'>",
+    "<dt>Label</dt><dd><p>This text is indented in a way pkgdown doesn't like.</p></dd>",
+    "</dl>"
+  ))
+})
+
+# Verbatim ----------------------------------------------------------------
+
+test_that("newlines are preserved in preformatted blocks", {
+  out <- flatten_para(rd_text("\\preformatted{a\n\nb\n\nc}"))
+  expect_equal(out, "<pre>a\n\nb\n\nc</pre>\n")
+})
+
+test_that("spaces are preserved in preformatted blocks", {
+  out <- flatten_para(rd_text("\\preformatted{a\n\n  b\n\n  c}"))
+  expect_equal(out, "<pre>a\n\n  b\n\n  c</pre>\n")
+})
+
 # Usage -------------------------------------------------------------------
 
 test_that("S4 methods gets comment", {
@@ -272,23 +353,15 @@ test_that("S3 methods gets comment", {
 test_that("eqn", {
   out <- rd2html(" \\eqn{\\alpha}{alpha}")
   expect_equal(out, "\\(\\alpha\\)")
-  out <- rd2html(" \\eqn{\\alpha}{alpha}", mathjax = FALSE)
-  expect_equal(out, "<code class = 'eq'>alpha</code>")
   out <- rd2html(" \\eqn{x}")
   expect_equal(out, "\\(x\\)")
-  out <- rd2html(" \\eqn{x}", mathjax = FALSE)
-  expect_equal(out, "<code class = 'eq'>x</code>")
 })
 
 test_that("deqn", {
   out <- rd2html(" \\deqn{\\alpha}{alpha}")
   expect_equal(out, "$$\\alpha$$")
-  out <- rd2html(" \\deqn{\\alpha}{alpha}", mathjax = FALSE)
-  expect_equal(out, "<pre class = 'eq'>alpha</pre>")
   out <- rd2html(" \\deqn{x}")
   expect_equal(out, "$$x$$")
-  out <- rd2html(" \\deqn{x}", mathjax = FALSE)
-  expect_equal(out, "<pre class = 'eq'>x</pre>")
 })
 
 
@@ -345,4 +418,27 @@ test_that("titles can contain other markup", {
 test_that("titles don't get autolinked code", {
   rd <- rd_text("\\title{\\code{foo()}}", fragment = FALSE)
   expect_equal(extract_title(rd), "<code>foo()</code>")
+})
+
+# Rd tag errors ------------------------------------------------------------------
+
+test_that("bad Rd tags throw errors", {
+  scoped_file_context("test-rd-html.R")
+
+  expect_error(
+    rd2html("\\url{}"),
+    "contains a bad Rd tag of type `url`. Check for empty"
+  )
+  expect_error(
+    rd2html("\\url{a\nb}"),
+    "contains a bad Rd tag of type `url`. This may be"
+  )
+  expect_error(
+    rd2html("\\email{}"),
+    "contains a bad Rd tag of type `email`"
+  )
+  expect_error(
+    rd2html("\\linkS4class{}"),
+    "contains a bad Rd tag of type `linkS4class`"
+  )
 })

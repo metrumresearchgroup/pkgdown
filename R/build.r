@@ -14,7 +14,7 @@
 #' that aspect of the site.
 #'
 #' Note if names of generated files were changed, you will need to use
-#' [clean_site] first to clean up orphan files.
+#' [clean_site()] first to clean up orphan files.
 #'
 #' @section YAML config:
 #' There are four top-level YAML settings that affect the entire site:
@@ -25,8 +25,16 @@
 #' paths will be taken relative to the package root.
 #'
 #' `url` optionally specifies the url where the site will be published.
-#' If you supply this, other pkgdown sites will link to your site when needed,
-#' rather than using generic links to \url{https://rdocumentation.org}.
+#' Supplying this will:
+#' * Allow other pkgdown sites to link to your site when needed,
+#'   rather than using generic links to <https://rdrr.io>.
+#' * Generate a `sitemap.xml`, increasing the searchability of your site.
+#' * Automatically generate a `CNAME` when
+#'   [deploying to github][deploy_site_github].
+#'
+#' ```yaml
+#' url: http://pkgdown.r-lib.org
+#' ```
 #'
 #' `title` overrides the default site title, which is the package name.
 #' It's used in the page title and default navbar.
@@ -42,7 +50,7 @@
 #'     href: http://hadley.nz
 #'   RStudio:
 #'     href: https://www.rstudio.com
-#'     html: <img src="https://tidyverse.org/rstudio-logo.svg" height="24" />
+#'     html: <img src="https://www.tidyverse.org/rstudio-logo.svg" height="24" />
 #' ```
 #'
 #' @section Development mode:
@@ -71,7 +79,7 @@
 #'
 #' ```
 #' development:
-#'   mode: development
+#'   mode: devel
 #' ```
 #'
 #' You can also have pkgdown automatically detect the mode with:
@@ -83,7 +91,7 @@
 #'
 #' The mode will be automatically determined based on the version number:
 #'
-#' * `0.0.0.9000`: unreleased
+#' * `0.0.0.9000` (`0.0.0.*`): unreleased
 #' * four version components: development
 #' * everything else -> release
 #'
@@ -106,7 +114,19 @@
 #' `version_tooltip`.
 #'
 #' @section YAML config - navbar:
-#' `navbar` controls the navbar at the top of the page. It has two primary
+#'
+#' By default, the top navigation bar (the "navbar") will contain links to:
+#'
+#' * The home page, with a "home" icon.
+#' * "Get Started", if you have an article with the same name as the package
+#'   (e.g., `vignettes/pkgdown.Rmd`).
+#' * Reference
+#' * Articles (i.e., vignettes, if present).
+#' * News (if present).
+#' * A "github" icon with a link to your
+#'   github repo (if listed in the `DESCRIPTION` url field).
+#'
+#' You can override these defaults with the  `navbar` field. It has two primary
 #' components: `structure` and `components`. These components interact in
 #' a somewhat complicated way, but the complexity allows you to make minor
 #' tweaks to part of the navbar while relying on pkgdown to automatically
@@ -126,7 +146,7 @@
 #'
 #' The `components` describes the appearance of each element in the navbar.
 #' It uses the same
-#' syntax as \href{http://rmarkdown.rstudio.com/rmarkdown_websites.html#site_navigation}{RMarkdown}.
+#' syntax as [RMarkdown](http://rmarkdown.rstudio.com/rmarkdown_websites.html#site_navigation).
 #' The following YAML snippet illustrates some of the most important features.
 #'
 #' ```
@@ -145,13 +165,13 @@
 #'     - text: Title B1
 #'       href: articles/b1.html
 #'    twitter:
-#'      icon: fa-lg fa-twitter
+#'      icon: "fab fa-twitter fa-lg"
 #'      href: http://twitter.com/hadleywickham
 #' ```
 #'
 #' Components can contain sub-`menu`s with headings (indicated by missing
-#' `href`) and separators (indicated by a bunch of `-`). You can use `icon`s
-#' from fontawesome: see a full list <https://fontawesome.io/icons/>.
+#' `href`) and separators (indicated by a bunch of `-`). You can also use `icon`s
+#' from [fontawesome](https://fontawesome.com/icons?d=gallery).
 #'
 #' This yaml would override the default "articles" component, eliminate
 #' the "home" component, and add a new "twitter" component. Unless you
@@ -170,14 +190,7 @@
 #'       index_name: INDEX_NAME
 #' ```
 #'
-#' You also need to add a `url:` field to `_pkgdown.yml` that specifies the
-#' location of your documentation on the web. For pkgdown, the URL field is:
-#'
-#' ```yaml
-#' url: http://pkgdown.r-lib.org
-#' ```
-#'
-#' See `vignette("pkgdown")` for details.
+#' You also need to add a `url:` field, see above.
 #'
 #' @section YAML config - template:
 #' You can get complete control over the appearance of the site using the
@@ -196,12 +209,17 @@
 #' ```
 #'
 #' See a complete list of themes and preview how they look at
-#' \url{https://gallery.shinyapps.io/117-shinythemes/}:
+#' <https://gallery.shinyapps.io/117-shinythemes/>:
 #'
 #' Optionally provide the `ganalytics` template parameter to enable
 #' [Google Analytics](https://www.google.com/analytics/). It should
 #' correspond to your
 #' [tracking id](https://support.google.com/analytics/answer/1032385).
+#'
+#' When enabling Google Analytics, be aware of the type and amount of
+#' user information that you are collecting. You may wish to limit the
+#' extent of data collection or to add a privacy disclosure to your
+#' site, in keeping with current laws and regulations.
 #'
 #' ```
 #' template:
@@ -240,13 +258,39 @@
 #' is little documentation, and you'll need to read the existing source
 #' for pkgdown templates to ensure that you use the correct components.
 #'
+#' @section Options:
+#' Users with limited internet connectivity can disable CRAN checks by setting
+#' `options(pkgdown.internet = FALSE)`. This will also disable some features
+#' from pkgdown that requires an internet connectivity. However, if it is used
+#' to build docs for a package that requires internet connectivity in examples
+#' or vignettes, this connection is required as this option won't apply on them.
+#'
+#' Users can set a timeout for `build_site(new_process = TRUE)` with
+#' `options(pkgdown.timeout = Inf)`, which is useful to prevent stalled builds from
+#' hanging in cron jobs.
+#'
 #' @inheritParams build_articles
 #' @inheritParams build_reference
 #' @param lazy If `TRUE`, will only rebuild articles and reference pages
 #'   if the source is newer than the destination.
+#' @param devel Use development or deployment process?
+#'
+#'   If `TRUE`, uses lighter-weight process suitable for rapid
+#'   iteration; it will run examples and vignettes in the current process,
+#'   and will load code with `pkgload::load_call()`.
+#'
+#'   If `FALSE`, will first install the package to a temporary library,
+#'   and will run all examples and vignettes in a new process.
+#'
+#'   `build_site()` defaults to `devel = FALSE` so that you get high fidelity
+#'   outputs when you building the complete site; `build_reference()`,
+#'   `build_home()` and friends default to `devel = TRUE` so that you can
+#'   rapidly iterate during development.
 #' @param new_process If `TRUE`, will run `build_site()` in a separate process.
 #'   This enhances reproducibility by ensuring nothing that you have loaded
 #'   in the current process affects the build process.
+#' @param install If `TRUE`, will install the package in a temporary library
+#'   so it is available for vignettes.
 #' @export
 #' @examples
 #' \dontrun{
@@ -256,72 +300,88 @@
 #' }
 build_site <- function(pkg = ".",
                        examples = TRUE,
-                       document = TRUE,
                        run_dont_run = FALSE,
                        seed = 1014,
-                       mathjax = TRUE,
                        lazy = FALSE,
                        override = list(),
                        preview = NA,
-                       new_process = TRUE) {
+                       devel = FALSE,
+                       new_process = !devel,
+                       install = !devel,
+                       document = "DEPRECATED") {
+  pkg <- as_pkgdown(pkg, override = override)
+
+  if (!missing(document)) {
+    warning("`document` is deprecated. Please use `devel` instead.", call. = FALSE)
+    devel <- document
+  }
+
+  if (install) {
+    withr::local_temp_libpaths()
+    rule("Installing package into temporary library")
+    utils::install.packages(pkg$src_path, repo = NULL, type = "source", quiet = TRUE)
+  }
 
   if (new_process) {
     build_site_external(
       pkg = pkg,
       examples = examples,
-      document = document,
       run_dont_run = run_dont_run,
       seed = seed,
-      mathjax = mathjax,
       lazy = lazy,
       override = override,
-      preview = preview
+      preview = preview,
+      devel = devel
     )
   } else {
     build_site_local(
       pkg = pkg,
       examples = examples,
-      document = document,
       run_dont_run = run_dont_run,
       seed = seed,
-      mathjax = mathjax,
       lazy = lazy,
       override = override,
-      preview = preview
+      preview = preview,
+      devel = devel
     )
   }
 }
 
 build_site_external <- function(pkg = ".",
                                 examples = TRUE,
-                                document = TRUE,
                                 run_dont_run = FALSE,
                                 seed = 1014,
-                                mathjax = TRUE,
                                 lazy = FALSE,
                                 override = list(),
-                                preview = NA) {
+                                preview = NA,
+                                devel = TRUE) {
   args <- list(
     pkg = pkg,
     examples = examples,
-    document = document,
     run_dont_run = run_dont_run,
     seed = seed,
-    mathjax = mathjax,
     lazy = lazy,
     override = override,
+    install = FALSE,
     preview = FALSE,
     new_process = FALSE,
+    devel = devel,
     crayon_enabled = crayon::has_color(),
-    crayon_colors = crayon::num_colors()
+    crayon_colors = crayon::num_colors(),
+    pkgdown_internet = has_internet()
   )
   callr::r(
-    function(..., crayon_enabled, crayon_colors) {
-      options(crayon.enabled = crayon_enabled, crayon.colors = crayon_colors)
+    function(..., crayon_enabled, crayon_colors, pkgdown_internet) {
+      options(
+        crayon.enabled = crayon_enabled,
+        crayon.colors = crayon_colors,
+        pkgdown.internet = pkgdown_internet
+      )
       pkgdown::build_site(...)
     },
     args = args,
     show = TRUE,
+    timeout = getOption('pkgdown.timeout', Inf)
   )
 
   preview_site(pkg, preview = preview)
@@ -330,13 +390,12 @@ build_site_external <- function(pkg = ".",
 
 build_site_local <- function(pkg = ".",
                        examples = TRUE,
-                       document = TRUE,
                        run_dont_run = FALSE,
                        seed = 1014,
-                       mathjax = TRUE,
                        lazy = FALSE,
                        override = list(),
-                       preview = NA
+                       preview = NA,
+                       devel = TRUE
                        ) {
 
   pkg <- section_init(pkg, depth = 0, override = override)
@@ -350,13 +409,12 @@ build_site_local <- function(pkg = ".",
   build_home(pkg, override = override, preview = FALSE)
   build_reference(pkg,
     lazy = lazy,
-    document = document,
     examples = examples,
     run_dont_run = run_dont_run,
-    mathjax = mathjax,
     seed = seed,
     override = override,
-    preview = FALSE
+    preview = FALSE,
+    devel = devel
   )
   build_articles(pkg, lazy = lazy, override = override, preview = FALSE)
   build_tutorials(pkg, override = override, preview = FALSE)

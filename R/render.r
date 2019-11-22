@@ -14,7 +14,7 @@
 #'   * `yaml`: the `template` key from `_pkgdown.yml`.
 #'   * `package`: package metadata including `name` and`version`.
 #'
-#'   See the full contents by running `data_template()`.
+#'   See the full contents by running [data_template()].
 #' @param path Location to create file; relative to destination directory.
 #'   If `""` (the default), prints to standard out.
 #' @param depth Depth of path relative to base directory.
@@ -28,7 +28,17 @@ render_page <- function(pkg = ".", name, data, path = "", depth = NULL, quiet = 
   }
 
   data <- utils::modifyList(data, data_template(pkg, depth = depth))
+  data$pkgdown <- list(
+    version = utils::packageVersion("pkgdown")
+  )
+  data$has_favicons <- has_favicons(pkg)
   data$opengraph <- utils::modifyList(data_open_graph(pkg), data$opengraph %||% list())
+
+  # The real location of 404.html is dynamic (#1129).
+  # Relative root does not work, use the full URL if available.
+  if(identical(path, "404.html") && length(pkg$meta$url)){
+    data$site$root <- paste0(pkg$meta$url, "/")
+  }
 
   # render template components
   pieces <- c("head", "navbar", "header", "content", "docsearch", "footer")
@@ -115,7 +125,7 @@ template_path <- function(pkg = ".") {
 }
 
 render_template <- function(path, data) {
-  template <- read_lines(path)
+  template <- read_file(path)
   if (length(template) == 0)
     return("")
 
