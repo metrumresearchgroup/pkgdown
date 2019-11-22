@@ -14,6 +14,9 @@ Status](https://www.r-pkg.org/badges/version/pkgdown)](https://cran.r-project.or
 [![Codecov test
 coverage](https://codecov.io/gh/r-lib/pkgdown/branch/master/graphs/badge.svg)](https://codecov.io/gh/r-lib/pkgdown?branch=master)
 
+> This fork will place the hexsticker in the right hand side sidebar
+> instead of the top of the homepage.
+
 pkgdown is designed to make it quick and easy to build a website for
 your package. You can see pkgdown in action at
 <https://pkgdown.r-lib.org>: this is the output of pkgdown applied to
@@ -21,12 +24,6 @@ the latest version of pkgdown. Learn more in `vignette("pkgdown")` or
 `?build_site`.
 
 ## Installation
-
-``` r
-knitr::opts_knit$get('rmarkdown.pandoc.to')
-#> [1] "gfm-ascii_identifiers"
-#gfm-ascii_identifiers
-```
 
 ``` r
 # Install release version from CRAN
