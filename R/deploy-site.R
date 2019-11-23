@@ -57,18 +57,17 @@
 #'   new keypair specifically for deploying the site. The easiest way is to use
 #'   `travis::use_travis_deploy()`.
 #' @param repo_slug The `user/repo` slug for the repository.
-#' @param host The github host url.
 #' @param commit_message The commit message to be used for the commit.
 #' @param verbose Print verbose output
 #' @param ... Additional arguments passed to [build_site()].
 #' @export
+# Using https://github.com/jimhester/pkgdown/blob/github-actions-deploy/R/deploy-site.R
 deploy_site_github <- function(
   pkg = ".",
   install = TRUE,
   tarball = Sys.getenv("PKG_TARBALL", ""),
   ssh_id = Sys.getenv("id_rsa", ""),
   repo_slug = Sys.getenv("TRAVIS_REPO_SLUG", ""),
-  host = "github.com",
   commit_message = construct_commit_message(pkg),
   verbose = FALSE,
   ...) {
@@ -98,48 +97,51 @@ deploy_site_github <- function(
   cat_line("Setting private key permissions to 0600")
   fs::file_chmod(ssh_id_file, "0600")
 
-  deploy_local(pkg, repo_slug = repo_slug, host = host, commit_message = commit_message, ...)
+  deploy_local(pkg, repo_slug = construct_remote_url(repo_slug = repo_slug), commit_message = commit_message, ...)
 
   rule("Deploy completed", line = 2)
 }
 
-deploy_local <- function(
-                         pkg = ".",
-                         repo_slug = NULL,
-                         host,
-                         commit_message = construct_commit_message(pkg),
-                         ...
-                         ) {
-  dest_dir <- fs::dir_create(fs::file_temp())
-  on.exit(fs::dir_delete(dest_dir))
-
-  pkg <- as_pkgdown(pkg)
+construct_remote_url <- function(pkg, repo_slug = NULL) {
   if (is.null(repo_slug)) {
+    pkg <- as_pkgdown(pkg)
     gh <- rematch2::re_match(pkg$github_url, github_url_rx())
     repo_slug <- paste0(gh$owner, "/", gh$repo)
   }
 
-  github_clone(dest_dir, repo_slug, host)
+  sprintf("git@github.com:%s.git", repo_slug)
+}
+
+deploy_local <- function(
+  pkg = ".",
+  remote_url = construct_remote_url(pkg),
+  commit_message = construct_commit_message(pkg),
+  ...
+) {
+
+  dest_dir <- fs::dir_create(fs::file_temp())
+  on.exit(fs::dir_delete(dest_dir))
+
+  github_clone(dest_dir, remote_url)
   build_site(".",
-    override = list(destination = dest_dir),
-    devel = FALSE,
-    preview = FALSE,
-    install = FALSE,
-    ...
+             override = list(destination = dest_dir),
+             devel = FALSE,
+             preview = FALSE,
+             install = FALSE,
+             ...
   )
   github_push(dest_dir, commit_message)
 
   invisible()
 }
 
-github_clone <- function(dir, repo_slug, host) {
-  remote_url <- sprintf("git@%s:%s.git", host, repo_slug)
+github_clone <- function(dir, remote_url) {
   rule("Cloning existing site", line = 1)
   git("clone",
-    "--single-branch", "-b", "gh-pages",
-    "--depth", "1",
-    remote_url,
-    dir
+      "--single-branch", "-b", "gh-pages",
+      "--depth", "1",
+      remote_url,
+      dir
   )
 }
 

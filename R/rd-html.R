@@ -265,6 +265,7 @@ as_html.tag_ifelse <- function(x, ...) {
 # Tables ---------------------------------------------------------------------
 
 #' @export
+#' @importFrom utils head
 as_html.tag_tabular <- function(x, ...) {
   align_abbr <- strsplit(as_html(x[[1]], ...), "")[[1]]
   align_abbr <- align_abbr[!(align_abbr %in% c("|", ""))]
@@ -289,7 +290,7 @@ as_html.tag_tabular <- function(x, ...) {
   cell_contents <- paste0("<td>", str_trim(cell_contents), "</td>")
 
   if(length(cell_contents)%%length(align)>0){
-    cell_contents <- head(cell_contents,-(length(cell_contents)%%length(align)))
+    cell_contents <- utils::head(cell_contents,-(length(cell_contents)%%length(align)))
   }
 
   cell_contents <- matrix(cell_contents, ncol = length(align), byrow = TRUE)

@@ -28,7 +28,7 @@ rd_file <- function(path, pkg_path = NULL) {
 #'
 #' rd2html("a & b")
 #'
-#' rd2html("\\strong{\\emph{x}}")
+#' rd2html("\\\\strong{\\\\emph{x}}")
 #'
 #' @export
 rd2html <- function(x, fragment = TRUE, ...) {
