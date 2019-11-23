@@ -1,7 +1,7 @@
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
 
-# pkgdown
+# pkgdown <img src="man/figures/logo.png" align="right" alt="" width="120" class="logo"/>
 
 [![Travis-CI build
 status](https://travis-ci.org/r-lib/pkgdown.svg?branch=master)](https://travis-ci.org/r-lib/pkgdown)
